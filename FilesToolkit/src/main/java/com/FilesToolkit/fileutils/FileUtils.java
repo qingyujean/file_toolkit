@@ -10,7 +10,14 @@ import java.io.IOException;
 import java.io.InputStreamReader;
 import java.io.OutputStreamWriter;
 import java.io.UnsupportedEncodingException;
+import java.net.SocketException;
+import java.text.SimpleDateFormat;
+import java.util.Date;
+import java.util.UUID;
 import java.util.logging.Logger;
+
+import org.apache.commons.net.ftp.FTPClient;
+import org.apache.commons.net.ftp.FTPReply;
 
 public class FileUtils {
 private static Logger log = Logger.getLogger("FileUtils");
@@ -118,6 +125,96 @@ private static Logger log = Logger.getLogger("FileUtils");
 		return deleteSuccess;
 	}
 	
+	//生成随机数与日期组成的文件名
+	public String getRandomFileName(){
+		String uuid=UUID.randomUUID().toString();
+        SimpleDateFormat df = new SimpleDateFormat("yyyy-MM-dd_HH-mm-ss");//设置日期格式
+        String currentTime = df.format(new Date());
+        //System.out.println(uuid+"_"+currentTime);
+        return uuid+"_"+currentTime;
+	}
 	
+	public boolean uploadFile(String hostname,// FTP服务器hostname
+			int port,// FTP服务器端口
+			String username, // FTP登录账号
+			String password, // FTP登录密码
+			String path, // FTP服务器保存目录
+			String srcFileName, // 上传到FTP服务器上的本地文件名
+			String destFileName//, // 上传到FTP服务器上的目标文件名
+			//String orginfilename // 输入流文件名
+		){
+		
+		FileInputStream fis = null;
+		try {
+			fis = new FileInputStream(new File(srcFileName));
+		} catch (FileNotFoundException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+		
+		//InputStream is = new ByteArrayInputStream(contents.getBytes());
+		
+		FTPClient ftpClient = new FTPClient();
+		ftpClient.setControlEncoding("gbk");//"GBK"
+		ftpClient.setBufferSize(1024);//设置1M缓冲
+		boolean uploadSuccess = false;
+		
+		try {
+			int reply;
+			ftpClient.connect(hostname, port);
+			ftpClient.login(username, password);
+			reply = ftpClient.getReplyCode();
+			if (!FTPReply.isPositiveCompletion(reply)) {
+				ftpClient.disconnect();
+				return uploadSuccess;
+			}
+			//设置文件类型
+			ftpClient.setFileType(FTPClient.BINARY_FILE_TYPE);
+			//设置上传目录
+			//ftpClient.makeDirectory(path);
+			ftpClient.changeWorkingDirectory(path);//进入或切换到该dir目录
+			
+			//上传
+			ftpClient.storeFile(destFileName, fis);
+			fis.close();
+			ftpClient.logout();
+			uploadSuccess = true;
+			log.info("文件"+destFileName+"上传成功！");
+			
+			
+			
+		} catch(FileNotFoundException e){
+			e.printStackTrace();
+		} catch (SocketException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} finally{
+			if(fis!=null){
+				try {
+					fis.close();
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+			}
+			
+			if (ftpClient.isConnected()) {
+				try {
+					ftpClient.disconnect();
+				} catch (IOException e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+					log.severe("关闭FTP连接发生异常！");
+					log.severe("Error:" + e.getMessage());
+				}
+
+			}
+		}
+		
+		return uploadSuccess;
+	}
 	
 }
